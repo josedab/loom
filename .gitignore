@@ -1,0 +1,54 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config files with secrets
+*.local.yaml
+*.secret.yaml
+.env
+
+# Build cache
+.cache/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Plugin binaries (keep examples)
+plugins/*.wasm
+!plugins/example-*.wasm
+
+# TLS certificates
+*.pem
+*.key
+*.crt
+!test/testdata/*.pem

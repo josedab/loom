@@ -1,0 +1,160 @@
+# Loom Configuration Example
+# WASM-First API Gateway
+
+listeners:
+  - name: http
+    address: ":8080"
+    protocol: http
+
+  - name: https
+    address: ":8443"
+    protocol: https
+    tls:
+      cert_file: /etc/loom/tls/cert.pem
+      key_file: /etc/loom/tls/key.pem
+
+  - name: grpc
+    address: ":9090"
+    protocol: grpc
+
+routes:
+  - id: api-v1
+    path: /api/v1/*
+    methods: [GET, POST, PUT, DELETE]
+    upstream: backend-api
+    plugins:
+      - jwt-auth
+      - rate-limit
+      - request-logger
+    timeout: 30s
+    priority: 100
+
+  - id: api-v2
+    path: /api/v2/*
+    methods: [GET, POST, PUT, DELETE, PATCH]
+    upstream: backend-api
+    plugins:
+      - jwt-auth
+      - rate-limit
+    timeout: 30s
+    priority: 90
+
+  - id: public
+    path: /public/*
+    methods: [GET]
+    upstream: static-content
+    strip_prefix: true
+    timeout: 10s
+    priority: 50
+
+  - id: health
+    path: /health
+    methods: [GET]
+    upstream: backend-api
+    timeout: 5s
+    priority: 200
+
+upstreams:
+  - name: backend-api
+    endpoints:
+      - "api-1.internal:8080"
+      - "api-2.internal:8080"
+      - "api-3.internal:8080"
+    load_balancer: round_robin
+    health_check:
+      path: /health
+      interval: 10s
+      timeout: 2s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+    circuit_breaker:
+      failure_threshold: 5
+      success_threshold: 3
+      timeout: 30s
+    retry:
+      max_retries: 3
+      backoff_base: 100ms
+      backoff_max: 10s
+      retryable_codes: [502, 503, 504]
+
+  - name: static-content
+    endpoints:
+      - "cdn.internal:80"
+    load_balancer: random
+
+plugins:
+  - name: jwt-auth
+    path: /etc/loom/plugins/jwt-auth.wasm
+    phase: on_request_headers
+    priority: 100
+    config:
+      issuer: "https://auth.example.com"
+      jwks_url: "https://auth.example.com/.well-known/jwks.json"
+    memory_limit: 16MB
+    timeout: 50ms
+
+  - name: rate-limit
+    path: /etc/loom/plugins/rate-limit.wasm
+    phase: on_request_headers
+    priority: 90
+    config:
+      requests_per_second: 100
+      burst: 200
+    memory_limit: 8MB
+    timeout: 10ms
+
+  - name: request-logger
+    path: /etc/loom/plugins/logger.wasm
+    phase: on_log
+    priority: 10
+    config:
+      format: json
+      include_body: false
+
+admin:
+  address: ":9091"
+  enabled: true
+
+metrics:
+  prometheus:
+    enabled: true
+    path: /metrics
+  opentelemetry:
+    enabled: false
+    endpoint: "otel-collector:4317"
+
+# Built-in rate limiting (applied globally)
+rate_limit:
+  enabled: true
+  rate: 1000          # requests per second
+  burst: 2000         # maximum burst size
+  cleanup_interval: 5m # cleanup stale buckets every 5 minutes
+
+# Distributed tracing with OpenTelemetry
+tracing:
+  enabled: false
+  endpoint: "otel-collector:4317"
+  service_name: "loom"
+  sample_rate: 1.0    # 0.0 to 1.0 (1.0 = 100% sampling)
+  batch_timeout: 5s
+
+# CORS configuration
+cors:
+  enabled: true
+  allow_origins:
+    - "*"
+  allow_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+  allow_headers:
+    - Authorization
+    - Content-Type
+    - X-Request-ID
+  expose_headers:
+    - X-Request-ID
+  max_age: 86400
+  allow_credentials: false
