@@ -65,6 +65,27 @@ func (p *Pipeline) GetChain(routeID string) []*PluginChainEntry {
 	return p.chains[routeID]
 }
 
+// ClearChains removes all plugin chains (used during hot-reload).
+func (p *Pipeline) ClearChains() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.chains = make(map[string][]*PluginChainEntry)
+}
+
+// RemoveChain removes a specific plugin chain.
+func (p *Pipeline) RemoveChain(routeID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.chains, routeID)
+}
+
+// GetChainCount returns the number of configured plugin chains.
+func (p *Pipeline) GetChainCount() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.chains)
+}
+
 // ExecuteRequestPhase executes all request phase plugins.
 func (p *Pipeline) ExecuteRequestPhase(
 	ctx context.Context,

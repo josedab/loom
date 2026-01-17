@@ -98,6 +98,21 @@ type CompiledPlugin struct {
 	Config       PluginConfig
 	instancePool sync.Pool
 	runtime      wazero.Runtime
+	version      uint64    // Incremented on reload
+	loadedAt     time.Time // When the plugin was loaded
+}
+
+// PluginInfo contains information about a loaded plugin.
+type PluginInfo struct {
+	Name       string                 `json:"name"`
+	Path       string                 `json:"path"`
+	Phase      string                 `json:"phase"`
+	Priority   int                    `json:"priority"`
+	Version    uint64                 `json:"version"`
+	LoadedAt   time.Time              `json:"loaded_at"`
+	MemoryMB   uint32                 `json:"memory_limit_mb,omitempty"`
+	TimeoutMs  int                    `json:"timeout_ms,omitempty"`
+	Config     map[string]interface{} `json:"config,omitempty"`
 }
 
 // PluginConfig defines plugin behavior.
@@ -113,12 +128,13 @@ type PluginConfig struct {
 
 // Runtime manages WASM plugin execution.
 type Runtime struct {
-	runtime    wazero.Runtime
-	modules    map[string]*CompiledPlugin
-	mu         sync.RWMutex
-	config     RuntimeConfig
-	host       *ProxyWasmHost
-	compCache  wazero.CompilationCache
+	runtime       wazero.Runtime
+	modules       map[string]*CompiledPlugin
+	mu            sync.RWMutex
+	config        RuntimeConfig
+	host          *ProxyWasmHost
+	compCache     wazero.CompilationCache
+	globalVersion uint64 // Incremented on each reconfigure
 }
 
 // NewRuntime creates a new WASM runtime.
@@ -196,6 +212,105 @@ func (r *Runtime) Configure(ctx context.Context, configs []config.PluginConfig) 
 	return nil
 }
 
+// Reconfigure performs hot-reload of plugins: loads new/updated plugins and removes deleted ones.
+// Returns the names of plugins that were added, updated, and removed.
+func (r *Runtime) Reconfigure(ctx context.Context, configs []config.PluginConfig) (added, updated, removed []string, err error) {
+	// Build map of new configuration
+	newConfigs := make(map[string]config.PluginConfig)
+	for _, cfg := range configs {
+		newConfigs[cfg.Name] = cfg
+	}
+
+	// Get current plugins
+	r.mu.RLock()
+	currentPlugins := make(map[string]*CompiledPlugin)
+	for name, p := range r.modules {
+		currentPlugins[name] = p
+	}
+	r.mu.RUnlock()
+
+	// Determine what changed
+	var toLoad []config.PluginConfig
+	var toRemove []string
+
+	// Find new and updated plugins
+	for name, cfg := range newConfigs {
+		existing, exists := currentPlugins[name]
+		if !exists {
+			// New plugin
+			toLoad = append(toLoad, cfg)
+			added = append(added, name)
+		} else if cfg.Path != existing.Config.Path ||
+			cfg.Phase != existing.Config.Phase.String() ||
+			cfg.Priority != existing.Config.Priority {
+			// Updated plugin
+			toLoad = append(toLoad, cfg)
+			updated = append(updated, name)
+		}
+	}
+
+	// Find removed plugins
+	for name := range currentPlugins {
+		if _, exists := newConfigs[name]; !exists {
+			toRemove = append(toRemove, name)
+			removed = append(removed, name)
+		}
+	}
+
+	// Remove old plugins first
+	for _, name := range toRemove {
+		if unloadErr := r.UnloadPlugin(ctx, name); unloadErr != nil {
+			err = fmt.Errorf("unloading plugin %s: %w", name, unloadErr)
+			return
+		}
+	}
+
+	// Load new/updated plugins
+	for _, cfg := range toLoad {
+		pluginCfg := PluginConfig{
+			Name:          cfg.Name,
+			Path:          cfg.Path,
+			Phase:         ParsePhase(cfg.Phase),
+			Priority:      cfg.Priority,
+			Configuration: cfg.Config,
+			TimeoutMs:     int(config.ParseDuration(cfg.Timeout, 100*time.Millisecond).Milliseconds()),
+		}
+
+		if cfg.MemoryLimit != "" {
+			var limit uint32
+			fmt.Sscanf(cfg.MemoryLimit, "%dMB", &limit)
+			pluginCfg.MemoryLimit = limit
+		}
+
+		if loadErr := r.LoadPlugin(ctx, pluginCfg); loadErr != nil {
+			err = fmt.Errorf("loading plugin %s: %w", cfg.Name, loadErr)
+			return
+		}
+	}
+
+	// Increment global version
+	r.mu.Lock()
+	r.globalVersion++
+	r.mu.Unlock()
+
+	return
+}
+
+// ReloadPlugin reloads a single plugin from disk without changing configuration.
+// Useful when plugin file is updated but config hasn't changed.
+func (r *Runtime) ReloadPlugin(ctx context.Context, name string) error {
+	r.mu.RLock()
+	existing, exists := r.modules[name]
+	r.mu.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("plugin not found: %s", name)
+	}
+
+	// Reload with the same configuration
+	return r.LoadPlugin(ctx, existing.Config)
+}
+
 // validatePluginPath ensures the plugin path doesn't escape the allowed directory (path traversal protection).
 func (r *Runtime) validatePluginPath(path string) (string, error) {
 	// If no plugin directory is configured, allow any path (backward compatibility)
@@ -240,11 +355,26 @@ func (r *Runtime) LoadPlugin(ctx context.Context, cfg PluginConfig) error {
 		return fmt.Errorf("compiling plugin: %w", err)
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Get existing version or start at 1
+	var version uint64 = 1
+	if existing, ok := r.modules[cfg.Name]; ok {
+		version = existing.version + 1
+		// Close the old module
+		if existing.Module != nil {
+			existing.Module.Close(ctx)
+		}
+	}
+
 	plugin := &CompiledPlugin{
-		Name:    cfg.Name,
-		Module:  compiled,
-		Config:  cfg,
-		runtime: r.runtime,
+		Name:     cfg.Name,
+		Module:   compiled,
+		Config:   cfg,
+		runtime:  r.runtime,
+		version:  version,
+		loadedAt: time.Now(),
 	}
 
 	// Initialize instance pool
@@ -258,9 +388,7 @@ func (r *Runtime) LoadPlugin(ctx context.Context, cfg PluginConfig) error {
 		},
 	}
 
-	r.mu.Lock()
 	r.modules[cfg.Name] = plugin
-	r.mu.Unlock()
 
 	return nil
 }
@@ -433,4 +561,56 @@ func (r *Runtime) GetLoadedPlugins() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// GetPluginInfo returns detailed information about a specific plugin.
+func (r *Runtime) GetPluginInfo(name string) (*PluginInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	p, ok := r.modules[name]
+	if !ok {
+		return nil, false
+	}
+
+	return &PluginInfo{
+		Name:      p.Name,
+		Path:      p.Config.Path,
+		Phase:     p.Config.Phase.String(),
+		Priority:  p.Config.Priority,
+		Version:   p.version,
+		LoadedAt:  p.loadedAt,
+		MemoryMB:  p.Config.MemoryLimit,
+		TimeoutMs: p.Config.TimeoutMs,
+		Config:    p.Config.Configuration,
+	}, true
+}
+
+// GetAllPluginInfo returns detailed information about all loaded plugins.
+func (r *Runtime) GetAllPluginInfo() []*PluginInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	infos := make([]*PluginInfo, 0, len(r.modules))
+	for _, p := range r.modules {
+		infos = append(infos, &PluginInfo{
+			Name:      p.Name,
+			Path:      p.Config.Path,
+			Phase:     p.Config.Phase.String(),
+			Priority:  p.Config.Priority,
+			Version:   p.version,
+			LoadedAt:  p.loadedAt,
+			MemoryMB:  p.Config.MemoryLimit,
+			TimeoutMs: p.Config.TimeoutMs,
+			Config:    p.Config.Configuration,
+		})
+	}
+	return infos
+}
+
+// GetGlobalVersion returns the current global version (incremented on each reconfigure).
+func (r *Runtime) GetGlobalVersion() uint64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.globalVersion
 }
