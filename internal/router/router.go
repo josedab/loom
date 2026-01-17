@@ -2,6 +2,7 @@
 package router
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -10,6 +11,12 @@ import (
 	"time"
 
 	"github.com/josedab/loom/internal/config"
+)
+
+// Common errors for route operations.
+var (
+	ErrRouteNotFound      = errors.New("route not found")
+	ErrRouteAlreadyExists = errors.New("route already exists")
 )
 
 // Route defines a routing rule.
@@ -438,6 +445,164 @@ func (r *Router) GetRoute(id string) (*Route, bool) {
 		}
 	}
 	return nil, false
+}
+
+// AddRoute adds a new route dynamically.
+// Uses copy-on-write: builds a new snapshot and atomically swaps it.
+func (r *Router) AddRoute(cfg config.RouteConfig) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	oldSnap := r.getSnapshot()
+
+	// Check if route already exists
+	for _, route := range oldSnap.routes {
+		if route.ID == cfg.ID {
+			return ErrRouteAlreadyExists
+		}
+	}
+
+	// Build new snapshot with existing routes plus the new one
+	newSnapshot := &routeSnapshot{
+		trees:  make(map[string]*radixNode),
+		routes: make([]*Route, 0, len(oldSnap.routes)+1),
+	}
+
+	// Copy existing routes
+	for _, route := range oldSnap.routes {
+		if err := r.addRouteToSnapshot(newSnapshot, route); err != nil {
+			return err
+		}
+	}
+
+	// Add new route
+	route := &Route{
+		ID:          cfg.ID,
+		Host:        cfg.Host,
+		Path:        cfg.Path,
+		Methods:     cfg.Methods,
+		Headers:     cfg.Headers,
+		QueryParams: cfg.QueryParams,
+		Upstream:    cfg.Upstream,
+		Plugins:     cfg.Plugins,
+		StripPrefix: cfg.StripPrefix,
+		Priority:    cfg.Priority,
+		Timeout:     config.ParseDuration(cfg.Timeout, 30*time.Second),
+	}
+
+	if len(route.Methods) == 0 {
+		route.Methods = []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+	}
+
+	if err := r.addRouteToSnapshot(newSnapshot, route); err != nil {
+		return err
+	}
+
+	// Atomically publish the new snapshot
+	r.snapshot.Store(newSnapshot)
+	return nil
+}
+
+// UpdateRoute updates an existing route.
+// Uses copy-on-write: builds a new snapshot and atomically swaps it.
+func (r *Router) UpdateRoute(id string, cfg config.RouteConfig) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	oldSnap := r.getSnapshot()
+
+	// Check if route exists
+	found := false
+	for _, route := range oldSnap.routes {
+		if route.ID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrRouteNotFound
+	}
+
+	// Build new snapshot with updated route
+	newSnapshot := &routeSnapshot{
+		trees:  make(map[string]*radixNode),
+		routes: make([]*Route, 0, len(oldSnap.routes)),
+	}
+
+	for _, oldRoute := range oldSnap.routes {
+		if oldRoute.ID == id {
+			// Add updated route
+			route := &Route{
+				ID:          cfg.ID,
+				Host:        cfg.Host,
+				Path:        cfg.Path,
+				Methods:     cfg.Methods,
+				Headers:     cfg.Headers,
+				QueryParams: cfg.QueryParams,
+				Upstream:    cfg.Upstream,
+				Plugins:     cfg.Plugins,
+				StripPrefix: cfg.StripPrefix,
+				Priority:    cfg.Priority,
+				Timeout:     config.ParseDuration(cfg.Timeout, 30*time.Second),
+			}
+
+			if len(route.Methods) == 0 {
+				route.Methods = []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+			}
+
+			if err := r.addRouteToSnapshot(newSnapshot, route); err != nil {
+				return err
+			}
+		} else {
+			// Copy existing route
+			if err := r.addRouteToSnapshot(newSnapshot, oldRoute); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Atomically publish the new snapshot
+	r.snapshot.Store(newSnapshot)
+	return nil
+}
+
+// DeleteRoute removes a route by ID.
+// Uses copy-on-write: builds a new snapshot and atomically swaps it.
+func (r *Router) DeleteRoute(id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	oldSnap := r.getSnapshot()
+
+	// Check if route exists
+	found := false
+	for _, route := range oldSnap.routes {
+		if route.ID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrRouteNotFound
+	}
+
+	// Build new snapshot without the deleted route
+	newSnapshot := &routeSnapshot{
+		trees:  make(map[string]*radixNode),
+		routes: make([]*Route, 0, len(oldSnap.routes)-1),
+	}
+
+	for _, oldRoute := range oldSnap.routes {
+		if oldRoute.ID != id {
+			if err := r.addRouteToSnapshot(newSnapshot, oldRoute); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Atomically publish the new snapshot
+	r.snapshot.Store(newSnapshot)
+	return nil
 }
 
 // SetNotFoundHandler sets the handler for unmatched requests.
