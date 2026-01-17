@@ -428,3 +428,124 @@ func BenchmarkMiddleware(b *testing.B) {
 		handler.ServeHTTP(rec, req)
 	}
 }
+
+func TestRecordCacheHit(t *testing.T) {
+	m := New()
+
+	m.RecordCacheHit("response")
+	m.RecordCacheHit("response")
+	m.RecordCacheHit("llm")
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_cache_hits_total") {
+		t.Error("expected loom_cache_hits_total in metrics")
+	}
+}
+
+func TestRecordCacheMiss(t *testing.T) {
+	m := New()
+
+	m.RecordCacheMiss("response")
+	m.RecordCacheMiss("llm")
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_cache_misses_total") {
+		t.Error("expected loom_cache_misses_total in metrics")
+	}
+}
+
+func TestRecordRateLimitRejection(t *testing.T) {
+	m := New()
+
+	m.RecordRateLimitRejection("/api/users", "192.168.1.1")
+	m.RecordRateLimitRejection("/api/orders", "192.168.1.2")
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_ratelimit_rejections_total") {
+		t.Error("expected loom_ratelimit_rejections_total in metrics")
+	}
+}
+
+func TestRecordAuthFailure(t *testing.T) {
+	m := New()
+
+	m.RecordAuthFailure("api_key", "invalid_key")
+	m.RecordAuthFailure("basic", "wrong_password")
+	m.RecordAuthFailure("jwt", "expired_token")
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_auth_failures_total") {
+		t.Error("expected loom_auth_failures_total in metrics")
+	}
+}
+
+func TestSetUpstreamHealthStatus(t *testing.T) {
+	m := New()
+
+	m.SetUpstreamHealthStatus("backend", "localhost:8080", true)
+	m.SetUpstreamHealthStatus("backend", "localhost:8081", false)
+	m.SetUpstreamHealthStatus("api", "api.example.com:443", true)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_upstream_health_status") {
+		t.Error("expected loom_upstream_health_status in metrics")
+	}
+}
+
+func TestRecordPluginCacheHit(t *testing.T) {
+	m := New()
+
+	m.RecordPluginCacheHit()
+	m.RecordPluginCacheHit()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_plugin_cache_hits_total") {
+		t.Error("expected loom_plugin_cache_hits_total in metrics")
+	}
+}
+
+func TestRecordPluginCacheMiss(t *testing.T) {
+	m := New()
+
+	m.RecordPluginCacheMiss()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "loom_plugin_cache_misses_total") {
+		t.Error("expected loom_plugin_cache_misses_total in metrics")
+	}
+}

@@ -24,6 +24,23 @@ type Metrics struct {
 	pluginDuration    *prometheus.HistogramVec
 	pluginErrors      *prometheus.CounterVec
 
+	// Cache metrics
+	cacheHitsTotal   *prometheus.CounterVec
+	cacheMissesTotal *prometheus.CounterVec
+
+	// Rate limit metrics
+	rateLimitRejectionsTotal *prometheus.CounterVec
+
+	// Auth metrics
+	authFailuresTotal *prometheus.CounterVec
+
+	// Upstream health metrics
+	upstreamHealthStatus *prometheus.GaugeVec
+
+	// Plugin cache metrics
+	pluginCacheHitsTotal   prometheus.Counter
+	pluginCacheMissesTotal prometheus.Counter
+
 	registry *prometheus.Registry
 }
 
@@ -125,6 +142,60 @@ func New() *Metrics {
 			},
 			[]string{"plugin", "phase"},
 		),
+		cacheHitsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "cache_hits_total",
+				Help:      "Total number of cache hits",
+			},
+			[]string{"cache_type"},
+		),
+		cacheMissesTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "cache_misses_total",
+				Help:      "Total number of cache misses",
+			},
+			[]string{"cache_type"},
+		),
+		rateLimitRejectionsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "ratelimit_rejections_total",
+				Help:      "Total number of rate limit rejections",
+			},
+			[]string{"route", "key"},
+		),
+		authFailuresTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "auth_failures_total",
+				Help:      "Total number of authentication failures",
+			},
+			[]string{"method", "reason"},
+		),
+		upstreamHealthStatus: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: "loom",
+				Name:      "upstream_health_status",
+				Help:      "Upstream endpoint health status (0=unhealthy, 1=healthy)",
+			},
+			[]string{"upstream", "endpoint"},
+		),
+		pluginCacheHitsTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "plugin_cache_hits_total",
+				Help:      "Total number of compiled WASM plugin cache hits",
+			},
+		),
+		pluginCacheMissesTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: "loom",
+				Name:      "plugin_cache_misses_total",
+				Help:      "Total number of compiled WASM plugin cache misses",
+			},
+		),
 		registry: registry,
 	}
 
@@ -141,6 +212,13 @@ func New() *Metrics {
 		m.circuitState,
 		m.pluginDuration,
 		m.pluginErrors,
+		m.cacheHitsTotal,
+		m.cacheMissesTotal,
+		m.rateLimitRejectionsTotal,
+		m.authFailuresTotal,
+		m.upstreamHealthStatus,
+		m.pluginCacheHitsTotal,
+		m.pluginCacheMissesTotal,
 	)
 
 	return m
@@ -190,6 +268,45 @@ func (m *Metrics) RecordPluginExecution(plugin, phase string, duration time.Dura
 	if err != nil {
 		m.pluginErrors.WithLabelValues(plugin, phase).Inc()
 	}
+}
+
+// RecordCacheHit records a cache hit.
+func (m *Metrics) RecordCacheHit(cacheType string) {
+	m.cacheHitsTotal.WithLabelValues(cacheType).Inc()
+}
+
+// RecordCacheMiss records a cache miss.
+func (m *Metrics) RecordCacheMiss(cacheType string) {
+	m.cacheMissesTotal.WithLabelValues(cacheType).Inc()
+}
+
+// RecordRateLimitRejection records a rate limit rejection.
+func (m *Metrics) RecordRateLimitRejection(route, key string) {
+	m.rateLimitRejectionsTotal.WithLabelValues(route, key).Inc()
+}
+
+// RecordAuthFailure records an authentication failure.
+func (m *Metrics) RecordAuthFailure(method, reason string) {
+	m.authFailuresTotal.WithLabelValues(method, reason).Inc()
+}
+
+// SetUpstreamHealthStatus sets the health status for an upstream endpoint.
+func (m *Metrics) SetUpstreamHealthStatus(upstream, endpoint string, healthy bool) {
+	status := 0.0
+	if healthy {
+		status = 1.0
+	}
+	m.upstreamHealthStatus.WithLabelValues(upstream, endpoint).Set(status)
+}
+
+// RecordPluginCacheHit records a compiled WASM plugin cache hit.
+func (m *Metrics) RecordPluginCacheHit() {
+	m.pluginCacheHitsTotal.Inc()
+}
+
+// RecordPluginCacheMiss records a compiled WASM plugin cache miss.
+func (m *Metrics) RecordPluginCacheMiss() {
+	m.pluginCacheMissesTotal.Inc()
 }
 
 // Middleware returns an HTTP middleware for metrics collection.
