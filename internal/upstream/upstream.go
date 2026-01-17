@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	ErrNoHealthyEndpoints = errors.New("no healthy endpoints available")
-	ErrCircuitOpen        = errors.New("circuit breaker is open")
-	ErrUpstreamNotFound   = errors.New("upstream not found")
+	ErrNoHealthyEndpoints    = errors.New("no healthy endpoints available")
+	ErrCircuitOpen           = errors.New("circuit breaker is open")
+	ErrUpstreamNotFound      = errors.New("upstream not found")
+	ErrUpstreamAlreadyExists = errors.New("upstream already exists")
 )
 
 // Endpoint is a single backend instance.
@@ -920,6 +921,119 @@ func (m *Manager) GetUpstreams() []*Upstream {
 		upstreams = append(upstreams, u)
 	}
 	return upstreams
+}
+
+// AddUpstream adds a new upstream dynamically.
+func (m *Manager) AddUpstream(cfg config.UpstreamConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.upstreams[cfg.Name]; exists {
+		return ErrUpstreamAlreadyExists
+	}
+
+	upstream := m.createUpstreamFromConfig(cfg)
+	m.upstreams[cfg.Name] = upstream
+	return nil
+}
+
+// UpdateUpstream updates an existing upstream.
+func (m *Manager) UpdateUpstream(name string, cfg config.UpstreamConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.upstreams[name]; !exists {
+		return ErrUpstreamNotFound
+	}
+
+	upstream := m.createUpstreamFromConfig(cfg)
+	m.upstreams[name] = upstream
+	return nil
+}
+
+// DeleteUpstream removes an upstream by name.
+func (m *Manager) DeleteUpstream(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.upstreams[name]; !exists {
+		return ErrUpstreamNotFound
+	}
+
+	delete(m.upstreams, name)
+	return nil
+}
+
+// createUpstreamFromConfig creates an Upstream from configuration.
+func (m *Manager) createUpstreamFromConfig(cfg config.UpstreamConfig) *Upstream {
+	endpoints := make([]*Endpoint, len(cfg.Endpoints))
+	for i, addr := range cfg.Endpoints {
+		ep := &Endpoint{
+			Address: addr,
+			Weight:  1, // Default weight
+		}
+		ep.SetHealthy(true) // Initially healthy
+		endpoints[i] = ep
+	}
+
+	var lb LoadBalancer
+	switch cfg.LoadBalancer {
+	case "weighted":
+		lb = NewWeightedBalancer()
+	case "least_conn":
+		lb = &LeastConnBalancer{}
+	case "random":
+		lb = NewRandomBalancer()
+	case "consistent_hash":
+		replicas := cfg.ConsistentHash.Replicas
+		if replicas <= 0 {
+			replicas = 150 // Default virtual nodes
+		}
+		lb = NewConsistentHashBalancer(replicas, cfg.ConsistentHash.HashKey)
+	default:
+		lb = &RoundRobinBalancer{}
+	}
+
+	circuit := NewCircuitBreaker(
+		int64(cfg.CircuitBreaker.FailureThreshold),
+		int64(cfg.CircuitBreaker.SuccessThreshold),
+		config.ParseDuration(cfg.CircuitBreaker.Timeout, 30*time.Second),
+	)
+
+	retry := &RetryPolicy{
+		MaxRetries:  cfg.Retry.MaxRetries,
+		BackoffBase: config.ParseDuration(cfg.Retry.BackoffBase, 100*time.Millisecond),
+		BackoffMax:  config.ParseDuration(cfg.Retry.BackoffMax, 10*time.Second),
+	}
+	if len(cfg.Retry.RetryableCodes) > 0 {
+		retry.RetryableCodes = make(map[int]bool)
+		for _, code := range cfg.Retry.RetryableCodes {
+			retry.RetryableCodes[code] = true
+		}
+	}
+
+	// Create retry budget to prevent retry storms
+	retryBudget := NewRetryBudget(0.2, 3, 10*time.Second)
+
+	// Create bulkhead if enabled
+	var bulkhead *Bulkhead
+	if cfg.Bulkhead.Enabled {
+		bulkhead = NewBulkhead(BulkheadConfig{
+			MaxConcurrent: int64(cfg.Bulkhead.MaxConcurrent),
+			QueueSize:     int64(cfg.Bulkhead.QueueSize),
+			Timeout:       config.ParseDuration(cfg.Bulkhead.Timeout, 0),
+		})
+	}
+
+	return &Upstream{
+		Name:         cfg.Name,
+		Endpoints:    endpoints,
+		LoadBalancer: lb,
+		Circuit:      circuit,
+		RetryPolicy:  retry,
+		RetryBudget:  retryBudget,
+		Bulkhead:     bulkhead,
+	}
 }
 
 // GetUpstreamAddress returns the address of a healthy endpoint for the upstream.
