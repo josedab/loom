@@ -59,14 +59,27 @@ type RouteConfig struct {
 
 // UpstreamConfig defines a backend service.
 type UpstreamConfig struct {
-	Name           string               `yaml:"name"`
-	Endpoints      []string             `yaml:"endpoints"`
-	LoadBalancer   string               `yaml:"load_balancer"` // round_robin, weighted, least_conn, random, consistent_hash
-	ConsistentHash ConsistentHashConfig `yaml:"consistent_hash,omitempty"`
-	HealthCheck    HealthCheckConfig    `yaml:"health_check,omitempty"`
-	CircuitBreaker CircuitConfig        `yaml:"circuit_breaker,omitempty"`
-	Retry          RetryConfig          `yaml:"retry,omitempty"`
-	Bulkhead       BulkheadConfig       `yaml:"bulkhead,omitempty"`
+	Name             string                 `yaml:"name"`
+	Endpoints        []string               `yaml:"endpoints"`
+	LoadBalancer     string                 `yaml:"load_balancer"` // round_robin, weighted, least_conn, random, consistent_hash
+	ConsistentHash   ConsistentHashConfig   `yaml:"consistent_hash,omitempty"`
+	HealthCheck      HealthCheckConfig      `yaml:"health_check,omitempty"`
+	CircuitBreaker   CircuitConfig          `yaml:"circuit_breaker,omitempty"`
+	Retry            RetryConfig            `yaml:"retry,omitempty"`
+	Bulkhead         BulkheadConfig         `yaml:"bulkhead,omitempty"`
+	ServiceDiscovery ServiceDiscoveryConfig `yaml:"service_discovery,omitempty"`
+}
+
+// ServiceDiscoveryConfig defines service discovery settings for an upstream.
+type ServiceDiscoveryConfig struct {
+	// Enabled enables service discovery for this upstream
+	Enabled bool `yaml:"enabled"`
+	// Provider is the discovery provider to use (dns, consul, kubernetes)
+	Provider string `yaml:"provider"`
+	// ServiceName is the service name to discover (defaults to upstream name)
+	ServiceName string `yaml:"service_name,omitempty"`
+	// RefreshInterval is how often to refresh the service list
+	RefreshInterval string `yaml:"refresh_interval,omitempty"`
 }
 
 // ConsistentHashConfig defines consistent hash load balancing settings.

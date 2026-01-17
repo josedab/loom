@@ -19,7 +19,10 @@ import (
 )
 
 func TestHashPassword(t *testing.T) {
-	hash := HashPassword("password123")
+	hash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if hash == "" {
 		t.Error("expected non-empty hash")
 	}
@@ -27,16 +30,26 @@ func TestHashPassword(t *testing.T) {
 		t.Error("hash should differ from original password")
 	}
 
-	// Same password should produce same hash
-	hash2 := HashPassword("password123")
-	if hash != hash2 {
-		t.Error("same password should produce same hash")
+	// Bcrypt produces different hashes for same password (due to random salt)
+	hash2, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hash == hash2 {
+		t.Error("bcrypt should produce different hashes due to random salt")
 	}
 
-	// Different password should produce different hash
-	hash3 := HashPassword("different")
-	if hash == hash3 {
-		t.Error("different passwords should produce different hashes")
+	// Both hashes should verify against the same password
+	if err := VerifyPassword(hash, "password123"); err != nil {
+		t.Error("hash should verify against original password")
+	}
+	if err := VerifyPassword(hash2, "password123"); err != nil {
+		t.Error("hash2 should verify against original password")
+	}
+
+	// Different password should not verify
+	if err := VerifyPassword(hash, "different"); err == nil {
+		t.Error("different password should not verify")
 	}
 }
 
@@ -48,9 +61,13 @@ func TestNewServer(t *testing.T) {
 	m := metrics.New()
 	c, _ := config.NewManager("")
 
+	passwordHash, err := HashPassword("secret")
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
 	auth := AuthConfig{
 		Enabled: true,
-		Users:   map[string]string{"admin": HashPassword("secret")},
+		Users:   map[string]string{"admin": passwordHash},
 	}
 
 	s := NewServer(r, u, p, h, m, c, auth)
@@ -129,6 +146,8 @@ func createTestServer(t *testing.T, auth AuthConfig) (*Server, *http.ServeMux) {
 	mux.HandleFunc("/plugins", s.handlePlugins)
 	mux.HandleFunc("/plugins/", s.handlePlugin)
 	mux.HandleFunc("/config", s.handleConfig)
+	mux.HandleFunc("/cache/stats", s.handleCacheStats)
+	mux.HandleFunc("/ratelimit/stats", s.handleRateLimitStats)
 
 	return s, mux
 }
@@ -230,7 +249,8 @@ func TestHandleRoutes(t *testing.T) {
 func TestHandleRoutesMethodNotAllowed(t *testing.T) {
 	_, mux := createTestServer(t, AuthConfig{})
 
-	req := httptest.NewRequest(http.MethodPost, "/routes", nil)
+	// DELETE is not allowed on the /routes collection endpoint
+	req := httptest.NewRequest(http.MethodDelete, "/routes", nil)
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, req)
@@ -361,7 +381,7 @@ func TestHandlePlugins(t *testing.T) {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
-	var plugins []PluginInfo
+	var plugins []*plugin.PluginInfo
 	if err := json.NewDecoder(rec.Body).Decode(&plugins); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -407,7 +427,10 @@ func TestHandleConfigMethodNotAllowed(t *testing.T) {
 }
 
 func TestBasicAuthMiddleware(t *testing.T) {
-	passwordHash := HashPassword("secret")
+	passwordHash, err := HashPassword("secret")
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
 	auth := AuthConfig{
 		Enabled: true,
 		Users:   map[string]string{"admin": passwordHash},
@@ -543,7 +566,7 @@ func TestUpstreamInfo(t *testing.T) {
 }
 
 func TestPluginInfo(t *testing.T) {
-	info := PluginInfo{
+	info := plugin.PluginInfo{
 		Name:     "auth",
 		Phase:    "request",
 		Priority: 100,
@@ -555,12 +578,163 @@ func TestPluginInfo(t *testing.T) {
 		t.Fatalf("failed to marshal: %v", err)
 	}
 
-	var decoded PluginInfo
+	var decoded plugin.PluginInfo
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
 	if decoded.Name != info.Name {
 		t.Errorf("expected name %s, got %s", info.Name, decoded.Name)
+	}
+}
+
+// mockCacheStatsProvider implements CacheStatsProvider for testing.
+type mockCacheStatsProvider struct {
+	stats CacheStats
+}
+
+func (m *mockCacheStatsProvider) GetStats() CacheStats {
+	return m.stats
+}
+
+// mockRateLimitStatsProvider implements RateLimitStatsProvider for testing.
+type mockRateLimitStatsProvider struct {
+	stats RateLimitStats
+}
+
+func (m *mockRateLimitStatsProvider) GetRateLimitStats() RateLimitStats {
+	return m.stats
+}
+
+func TestHandleCacheStats(t *testing.T) {
+	server, mux := createTestServer(t, AuthConfig{})
+
+	// Set up mock cache stats provider
+	server.SetCacheStatsProvider(&mockCacheStatsProvider{
+		stats: CacheStats{
+			Hits:        100,
+			Misses:      20,
+			Evictions:   5,
+			Expirations: 10,
+			StaleHits:   3,
+			Errors:      1,
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/cache/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result["hits"].(float64) != 100 {
+		t.Errorf("expected 100 hits, got %v", result["hits"])
+	}
+	if result["misses"].(float64) != 20 {
+		t.Errorf("expected 20 misses, got %v", result["misses"])
+	}
+	// Hit rate should be 100/(100+20) * 100 = 83.33...
+	hitRate := result["hit_rate"].(float64)
+	if hitRate < 83 || hitRate > 84 {
+		t.Errorf("expected hit_rate around 83.33, got %v", hitRate)
+	}
+}
+
+func TestHandleCacheStats_NotConfigured(t *testing.T) {
+	_, mux := createTestServer(t, AuthConfig{})
+
+	req := httptest.NewRequest(http.MethodGet, "/cache/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Errorf("expected 501, got %d", rec.Code)
+	}
+}
+
+func TestHandleCacheStats_MethodNotAllowed(t *testing.T) {
+	server, mux := createTestServer(t, AuthConfig{})
+	server.SetCacheStatsProvider(&mockCacheStatsProvider{})
+
+	req := httptest.NewRequest(http.MethodPost, "/cache/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405, got %d", rec.Code)
+	}
+}
+
+func TestHandleRateLimitStats(t *testing.T) {
+	server, mux := createTestServer(t, AuthConfig{})
+
+	// Set up mock rate limit stats provider
+	server.SetRateLimitStatsProvider(&mockRateLimitStatsProvider{
+		stats: RateLimitStats{
+			ActiveKeys:   50,
+			TotalAllowed: 1000,
+			TotalDenied:  25,
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ratelimit/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result["active_keys"].(float64) != 50 {
+		t.Errorf("expected 50 active_keys, got %v", result["active_keys"])
+	}
+	if result["total_allowed"].(float64) != 1000 {
+		t.Errorf("expected 1000 total_allowed, got %v", result["total_allowed"])
+	}
+	if result["total_denied"].(float64) != 25 {
+		t.Errorf("expected 25 total_denied, got %v", result["total_denied"])
+	}
+}
+
+func TestHandleRateLimitStats_NotConfigured(t *testing.T) {
+	_, mux := createTestServer(t, AuthConfig{})
+
+	req := httptest.NewRequest(http.MethodGet, "/ratelimit/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Errorf("expected 501, got %d", rec.Code)
+	}
+}
+
+func TestHandleRateLimitStats_MethodNotAllowed(t *testing.T) {
+	server, mux := createTestServer(t, AuthConfig{})
+	server.SetRateLimitStatsProvider(&mockRateLimitStatsProvider{})
+
+	req := httptest.NewRequest(http.MethodDelete, "/ratelimit/stats", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405, got %d", rec.Code)
 	}
 }
