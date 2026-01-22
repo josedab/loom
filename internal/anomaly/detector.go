@@ -13,13 +13,15 @@ import (
 
 // Detector detects anomalies in API traffic.
 type Detector struct {
-	config    DetectorConfig
-	metrics   *MetricStore
-	baselines map[string]*Baseline
-	alerts    []Alert
-	alertChan chan Alert
-	logger    *slog.Logger
-	mu        sync.RWMutex
+	config      DetectorConfig
+	metrics     *MetricStore
+	baselines   map[string]*Baseline
+	alerts      []Alert
+	alertChan   chan Alert
+	logger      *slog.Logger
+	mlDetector  *MLDetector
+	mlEnabled   bool
+	mu          sync.RWMutex
 }
 
 // DetectorConfig configures the anomaly detector.
@@ -42,6 +44,10 @@ type DetectorConfig struct {
 	EnableRateAnomalies bool
 	// EnablePatternAnomalies enables unusual pattern detection
 	EnablePatternAnomalies bool
+	// EnableMLDetection enables ML-based anomaly detection
+	EnableMLDetection bool
+	// MLConfig configures the ML detector
+	MLConfig MLConfig
 	// Logger for detector events
 	Logger *slog.Logger
 }
@@ -58,6 +64,8 @@ func DefaultDetectorConfig() DetectorConfig {
 		EnableErrorAnomalies:   true,
 		EnableRateAnomalies:    true,
 		EnablePatternAnomalies: true,
+		EnableMLDetection:      false, // Disabled by default, can be enabled
+		MLConfig:               DefaultMLConfig(),
 	}
 }
 
@@ -256,10 +264,21 @@ func New(config DetectorConfig) *Detector {
 		alerts:    make([]Alert, 0),
 		alertChan: make(chan Alert, 100),
 		logger:    config.Logger,
+		mlEnabled: config.EnableMLDetection,
+	}
+
+	// Initialize ML detector if enabled
+	if config.EnableMLDetection {
+		d.mlDetector = NewMLDetector(config.MLConfig)
 	}
 
 	// Start baseline learning
 	go d.baselineLearningLoop()
+
+	// Start ML training loop if enabled
+	if d.mlEnabled {
+		go d.mlTrainingLoop()
+	}
 
 	return d
 }
@@ -280,31 +299,39 @@ func (d *Detector) Record(m Metric) []Alert {
 func (d *Detector) detect(m Metric) []Alert {
 	d.mu.RLock()
 	baseline := d.baselines[baselineKey(m.Route, m.Method)]
+	mlEnabled := d.mlEnabled
 	d.mu.RUnlock()
-
-	if baseline == nil || baseline.Samples < d.config.MinSamples {
-		return nil // Not enough data for detection
-	}
 
 	var alerts []Alert
 
-	// Check latency anomaly
-	if d.config.EnableLatencyAnomalies {
-		if alert := d.detectLatencyAnomaly(m, baseline); alert != nil {
-			alerts = append(alerts, *alert)
+	// Statistical detection requires baseline
+	if baseline != nil && baseline.Samples >= d.config.MinSamples {
+		// Check latency anomaly
+		if d.config.EnableLatencyAnomalies {
+			if alert := d.detectLatencyAnomaly(m, baseline); alert != nil {
+				alerts = append(alerts, *alert)
+			}
+		}
+
+		// Check error anomaly
+		if d.config.EnableErrorAnomalies && m.StatusCode >= 500 {
+			if alert := d.detectErrorAnomaly(m, baseline); alert != nil {
+				alerts = append(alerts, *alert)
+			}
 		}
 	}
 
-	// Check error anomaly
-	if d.config.EnableErrorAnomalies && m.StatusCode >= 500 {
-		if alert := d.detectErrorAnomaly(m, baseline); alert != nil {
-			alerts = append(alerts, *alert)
-		}
+	// ML-based detection
+	if mlEnabled && d.mlDetector != nil {
+		mlAlerts := d.DetectWithML(m)
+		alerts = append(alerts, mlAlerts...)
 	}
 
-	// Store and notify alerts
+	// Store and notify alerts (dedup already-stored ML alerts)
 	for _, alert := range alerts {
-		d.storeAlert(alert)
+		if alert.Metadata == nil || alert.Metadata["ml_method"] == nil {
+			d.storeAlert(alert)
+		}
 	}
 
 	return alerts
@@ -501,6 +528,86 @@ func (d *Detector) baselineLearningLoop() {
 	}
 }
 
+// mlTrainingLoop periodically retrains the ML models.
+func (d *Detector) mlTrainingLoop() {
+	// Initial training after warm-up period
+	time.Sleep(5 * time.Minute)
+	d.trainML()
+
+	// Retrain every hour
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		d.trainML()
+	}
+}
+
+// trainML trains the ML detector on historical data.
+func (d *Detector) trainML() {
+	if d.mlDetector == nil {
+		return
+	}
+
+	metrics := d.metrics.Query(MetricFilter{
+		Duration: d.config.BaselinePeriod,
+	})
+
+	if len(metrics) >= d.config.MinSamples {
+		d.mlDetector.Train(metrics)
+		d.logger.Info("ML models retrained",
+			"sample_count", len(metrics),
+		)
+	}
+}
+
+// DetectWithML performs ML-based anomaly detection on a metric.
+func (d *Detector) DetectWithML(m Metric) []Alert {
+	if d.mlDetector == nil || !d.mlEnabled {
+		return nil
+	}
+
+	// Get recent history for context
+	history := d.metrics.Query(MetricFilter{
+		Duration: d.config.WindowSize,
+		Route:    m.Route,
+		Method:   m.Method,
+	})
+
+	anomaly := d.mlDetector.PredictSingle(m, history)
+	if anomaly != nil {
+		alert := anomaly.ToAlert()
+		d.storeAlert(alert)
+		return []Alert{alert}
+	}
+
+	return nil
+}
+
+// GetMLDetector returns the ML detector instance.
+func (d *Detector) GetMLDetector() *MLDetector {
+	return d.mlDetector
+}
+
+// EnableML enables or disables ML-based detection.
+func (d *Detector) EnableML(enabled bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if enabled && d.mlDetector == nil {
+		d.mlDetector = NewMLDetector(d.config.MLConfig)
+		go d.mlTrainingLoop()
+	}
+	d.mlEnabled = enabled
+}
+
+// IsMLEnabled returns whether ML detection is enabled.
+func (d *Detector) IsMLEnabled() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.mlEnabled
+}
+
 // updateBaselines recalculates baselines from historical data.
 func (d *Detector) updateBaselines() {
 	metrics := d.metrics.Query(MetricFilter{
@@ -603,11 +710,24 @@ func (d *Detector) Stats() map[string]interface{} {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"metric_count":   d.metrics.Count(),
 		"baseline_count": len(d.baselines),
 		"alert_count":    len(d.alerts),
+		"ml_enabled":     d.mlEnabled,
 	}
+
+	// Add ML-specific stats if enabled
+	if d.mlEnabled && d.mlDetector != nil {
+		stats["ml_config"] = map[string]interface{}{
+			"num_trees":          d.config.MLConfig.NumTrees,
+			"subsample_size":     d.config.MLConfig.SubsampleSize,
+			"contamination_rate": d.config.MLConfig.ContaminationRate,
+			"arima_order":        []int{d.config.MLConfig.AROrder, d.config.MLConfig.IOrder, d.config.MLConfig.MAOrder},
+		}
+	}
+
+	return stats
 }
 
 // APIHandler returns an HTTP handler for the anomaly detection API.

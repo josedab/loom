@@ -458,11 +458,11 @@ func TestPatternAnalyzer(t *testing.T) {
 	detector := New(DefaultDetectorConfig())
 	analyzer := NewPatternAnalyzer(detector)
 
-	// Add diverse metrics
+	// Add diverse metrics - use short intervals to stay within the store's maxAge
 	now := time.Now()
 	for i := 0; i < 1000; i++ {
 		detector.Record(Metric{
-			Timestamp: now.Add(time.Duration(-i) * time.Minute),
+			Timestamp: now.Add(time.Duration(-i) * time.Second), // Use seconds instead of minutes
 			Route:     "/api/test",
 			Method:    "GET",
 			UserAgent: "common-user-agent",
