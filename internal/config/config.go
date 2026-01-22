@@ -26,6 +26,81 @@ type Config struct {
 	Tracing     TracingConfig     `yaml:"tracing,omitempty"`
 	CORS        CORSConfig        `yaml:"cors,omitempty"`
 	Cache       CacheConfig       `yaml:"cache,omitempty"`
+	AIGateway   AIGatewayConfig   `yaml:"ai_gateway,omitempty"`
+}
+
+// AIGatewayConfig defines AI/LLM gateway settings.
+type AIGatewayConfig struct {
+	// Enabled enables AI gateway functionality
+	Enabled bool `yaml:"enabled"`
+	// Providers defines LLM provider configurations
+	Providers []AIProviderConfig `yaml:"providers,omitempty"`
+	// RoutingStrategy defines how providers are selected
+	RoutingStrategy string `yaml:"routing_strategy,omitempty"` // priority, round_robin, weighted, cost_optimized, latency_optimized
+	// Cache configures response caching
+	Cache AIGatewayCacheConfig `yaml:"cache,omitempty"`
+	// TokenCounting enables token counting headers
+	TokenCounting bool `yaml:"token_counting"`
+	// PromptGuard enables prompt injection detection
+	PromptGuard AIPromptGuardConfig `yaml:"prompt_guard,omitempty"`
+	// MaxTokensPerRequest limits tokens per request
+	MaxTokensPerRequest int `yaml:"max_tokens_per_request,omitempty"`
+	// RequestTimeout is the timeout for provider requests
+	RequestTimeout string `yaml:"request_timeout,omitempty"`
+}
+
+// AIProviderConfig defines an LLM provider.
+type AIProviderConfig struct {
+	// Name is the unique provider name
+	Name string `yaml:"name"`
+	// Provider type (openai, anthropic, azure, local)
+	Provider string `yaml:"provider"`
+	// Endpoint is the API endpoint URL
+	Endpoint string `yaml:"endpoint"`
+	// APIKey is the API key (can use env vars: ${OPENAI_API_KEY})
+	APIKey string `yaml:"api_key,omitempty"`
+	// OrgID is the organization ID (for OpenAI)
+	OrgID string `yaml:"org_id,omitempty"`
+	// Model is the default model for this provider
+	Model string `yaml:"model,omitempty"`
+	// Weight is used for weighted routing
+	Weight int `yaml:"weight,omitempty"`
+	// Priority is used for priority routing (higher = preferred)
+	Priority int `yaml:"priority,omitempty"`
+	// CostPer1K is the cost per 1000 tokens
+	CostPer1K float64 `yaml:"cost_per_1k,omitempty"`
+	// RateLimit is requests per second
+	RateLimit int `yaml:"rate_limit,omitempty"`
+	// Timeout is the request timeout
+	Timeout string `yaml:"timeout,omitempty"`
+	// HealthPath is the health check path
+	HealthPath string `yaml:"health_path,omitempty"`
+	// Headers are additional headers to send
+	Headers map[string]string `yaml:"headers,omitempty"`
+}
+
+// AIGatewayCacheConfig defines AI gateway caching settings.
+type AIGatewayCacheConfig struct {
+	// Enabled enables caching
+	Enabled bool `yaml:"enabled"`
+	// MaxSize is the maximum cache size (e.g., "100MB")
+	MaxSize string `yaml:"max_size,omitempty"`
+	// DefaultTTL is the default cache TTL (e.g., "1h")
+	DefaultTTL string `yaml:"default_ttl,omitempty"`
+	// SemanticMatching enables semantic similarity matching
+	SemanticMatching bool `yaml:"semantic_matching"`
+	// SimilarityThreshold is the minimum similarity for semantic matches (0.0-1.0)
+	SimilarityThreshold float64 `yaml:"similarity_threshold,omitempty"`
+	// VaryByHeaders are headers that create cache variance
+	VaryByHeaders []string `yaml:"vary_by_headers,omitempty"`
+}
+
+// AIPromptGuardConfig defines prompt guard settings.
+type AIPromptGuardConfig struct {
+	// Enabled enables prompt injection detection
+	Enabled bool `yaml:"enabled"`
+	// BlockOnDetection blocks requests with detected injection
+	BlockOnDetection bool `yaml:"block_on_detection"`
 }
 
 // ListenerConfig defines a listener endpoint.
