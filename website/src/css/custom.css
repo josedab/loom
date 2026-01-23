@@ -1,0 +1,299 @@
+/**
+ * Loom API Gateway - Custom Styles
+ * Deep blue/purple theme inspired by the architecture diagrams
+ */
+
+/* Primary color palette - Deep blue/purple */
+:root {
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f46e5;
+  --ifm-color-primary-darker: #4338ca;
+  --ifm-color-primary-darkest: #3730a3;
+  --ifm-color-primary-light: #818cf8;
+  --ifm-color-primary-lighter: #a5b4fc;
+  --ifm-color-primary-lightest: #c7d2fe;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(99, 102, 241, 0.1);
+
+  /* Custom Loom colors */
+  --loom-bg-gradient-start: #f8fafc;
+  --loom-bg-gradient-end: #e2e8f0;
+  --loom-text-muted: #64748b;
+  --loom-card-bg: #ffffff;
+  --loom-card-border: #e2e8f0;
+  --loom-code-bg: #f1f5f9;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+  --docusaurus-highlighted-code-line-bg: rgba(129, 140, 248, 0.2);
+
+  /* Custom Loom colors - dark mode */
+  --loom-bg-gradient-start: #0f172a;
+  --loom-bg-gradient-end: #1e293b;
+  --loom-text-muted: #94a3b8;
+  --loom-card-bg: #1e293b;
+  --loom-card-border: #334155;
+  --loom-code-bg: #0f172a;
+
+  --ifm-background-color: #0f172a;
+  --ifm-navbar-background-color: #1e293b;
+  --ifm-footer-background-color: #0f172a;
+}
+
+/* Hero section styles */
+.hero--primary {
+  background: linear-gradient(135deg, var(--loom-bg-gradient-start) 0%, var(--loom-bg-gradient-end) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme='dark'] .hero--primary {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.hero__title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero__subtitle {
+  font-size: 1.5rem;
+  color: var(--loom-text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Feature cards */
+.feature-card {
+  background: var(--loom-card-bg);
+  border: 1px solid var(--loom-card-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] .feature-card:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Code blocks */
+.prism-code {
+  border-radius: 8px;
+}
+
+/* Install command box */
+.install-command {
+  background: var(--loom-code-bg);
+  border: 1px solid var(--loom-card-border);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  font-family: var(--ifm-font-family-monospace);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 500px;
+  margin: 1.5rem auto;
+}
+
+.install-command code {
+  background: none;
+  padding: 0;
+}
+
+.copy-button {
+  background: var(--ifm-color-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.copy-button:hover {
+  background: var(--ifm-color-primary-dark);
+}
+
+/* Section styling */
+.section {
+  padding: 4rem 0;
+}
+
+.section--alt {
+  background: var(--loom-bg-gradient-start);
+}
+
+[data-theme='dark'] .section--alt {
+  background: #1e293b;
+}
+
+.section__title {
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.section__subtitle {
+  font-size: 1.125rem;
+  color: var(--loom-text-muted);
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto 3rem;
+}
+
+/* Comparison table */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2rem 0;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--loom-card-border);
+}
+
+.comparison-table th {
+  background: var(--loom-card-bg);
+  font-weight: 600;
+}
+
+.comparison-table tr:hover {
+  background: var(--loom-code-bg);
+}
+
+/* Badge styles */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge--primary {
+  background: var(--ifm-color-primary);
+  color: white;
+}
+
+.badge--success {
+  background: #10b981;
+  color: white;
+}
+
+.badge--warning {
+  background: #f59e0b;
+  color: white;
+}
+
+/* Navbar customization */
+.navbar {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .navbar {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar customization */
+.menu__link {
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.menu__link--active {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme='dark'] .menu__link--active {
+  background: rgba(129, 140, 248, 0.15);
+}
+
+/* Announcement bar */
+.announcementBar_node_modules-\@docusaurus-theme-classic-lib-theme-AnnouncementBar-styles-module {
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 996px) {
+  .hero__title {
+    font-size: 2.5rem;
+  }
+
+  .hero__subtitle {
+    font-size: 1.25rem;
+  }
+}
+
+/* Architecture diagram container */
+.architecture-diagram {
+  background: var(--loom-card-bg);
+  border: 1px solid var(--loom-card-border);
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+  overflow-x: auto;
+}
+
+/* Terminal-style code blocks */
+.terminal {
+  background: #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.terminal__header {
+  background: #334155;
+  padding: 0.5rem 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.terminal__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal__dot--red { background: #ef4444; }
+.terminal__dot--yellow { background: #f59e0b; }
+.terminal__dot--green { background: #10b981; }
+
+.terminal__content {
+  padding: 1rem;
+  color: #e2e8f0;
+  font-family: var(--ifm-font-family-monospace);
+}
+
+/* Mermaid diagram customization */
+.docusaurus-mermaid-container {
+  background: var(--loom-card-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}

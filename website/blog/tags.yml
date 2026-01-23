@@ -1,0 +1,29 @@
+announcement:
+  label: Announcement
+  permalink: /announcement
+  description: Project announcements and news
+
+release:
+  label: Release
+  permalink: /release
+  description: Release notes and updates
+
+tutorial:
+  label: Tutorial
+  permalink: /tutorial
+  description: Tutorials and how-to guides
+
+feature:
+  label: Feature
+  permalink: /feature
+  description: Feature highlights and deep dives
+
+performance:
+  label: Performance
+  permalink: /performance
+  description: Performance tips and benchmarks
+
+community:
+  label: Community
+  permalink: /community
+  description: Community news and events

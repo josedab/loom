@@ -1,0 +1,345 @@
+.heroBanner {
+  padding: 6rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Badges */
+.badges {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.badge img {
+  height: 20px;
+}
+
+.installBox {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 1rem;
+}
+
+[data-theme='dark'] .installBox {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.copyButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ifm-color-primary);
+  transition: background 0.2s ease;
+}
+
+.copyButton:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme='dark'] .copyButton {
+  color: var(--ifm-color-primary-light);
+}
+
+[data-theme='dark'] .copyButton:hover {
+  background: rgba(129, 140, 248, 0.2);
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Features Section */
+.features {
+  padding: 6rem 0;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.sectionTitle {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.sectionSubtitle {
+  font-size: 1.25rem;
+  color: var(--loom-text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.featureCol {
+  margin-bottom: 2rem;
+}
+
+.featureCard {
+  background: var(--loom-card-bg);
+  border: 1px solid var(--loom-card-border);
+  border-radius: 12px;
+  padding: 2rem;
+  height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.featureCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] .featureCard:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.featureIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.featureTitle {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.featureDescription {
+  color: var(--loom-text-muted);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Section styling */
+.section {
+  padding: 6rem 0;
+}
+
+.sectionAlt {
+  background: var(--loom-bg-gradient-start);
+}
+
+[data-theme='dark'] .sectionAlt {
+  background: #1e293b;
+}
+
+.sectionText {
+  font-size: 1.125rem;
+  color: var(--loom-text-muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.7;
+}
+
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem 0;
+}
+
+.featureList li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: var(--loom-text-muted);
+}
+
+.featureList li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--ifm-color-primary);
+  font-weight: bold;
+}
+
+/* Stats Grid */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.statCard {
+  text-align: center;
+  padding: 2rem;
+  background: var(--loom-card-bg);
+  border: 1px solid var(--loom-card-border);
+  border-radius: 12px;
+}
+
+.statNumber {
+  font-size: 3rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--loom-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Comparison Table */
+.comparisonTable {
+  overflow-x: auto;
+  margin: 2rem 0;
+}
+
+.comparisonTable table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--loom-card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.comparisonTable th,
+.comparisonTable td {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--loom-card-border);
+}
+
+.comparisonTable th {
+  background: var(--loom-code-bg);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.comparisonTable th:first-child {
+  text-align: left;
+}
+
+.comparisonTable td:first-child {
+  font-weight: 500;
+}
+
+.comparisonTable tr:last-child td {
+  border-bottom: none;
+}
+
+.check {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.partial {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.cross {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.comparisonCta {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+/* CTA Section */
+.ctaSection {
+  padding: 6rem 0;
+  text-align: center;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, #a855f7 100%);
+  color: white;
+}
+
+.ctaTitle {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: white;
+}
+
+.ctaSubtitle {
+  font-size: 1.25rem;
+  opacity: 0.9;
+  margin-bottom: 2rem;
+}
+
+.ctaButtons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.ctaButtons .button--primary {
+  background: white;
+  color: var(--ifm-color-primary);
+  border-color: white;
+}
+
+.ctaButtons .button--primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ctaButtons .button--secondary {
+  background: transparent;
+  color: white;
+  border-color: white;
+}
+
+.ctaButtons .button--secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 996px) {
+  .heroBanner {
+    padding: 4rem 0;
+  }
+
+  .sectionTitle {
+    font-size: 2rem;
+  }
+
+  .features,
+  .section {
+    padding: 4rem 0;
+  }
+
+  .statNumber {
+    font-size: 2rem;
+  }
+}

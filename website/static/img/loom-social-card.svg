@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#16213e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f3460;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+
+  <!-- Decorative grid pattern -->
+  <g opacity="0.1">
+    <line x1="0" y1="100" x2="1200" y2="100" stroke="#6366f1" stroke-width="1"/>
+    <line x1="0" y1="200" x2="1200" y2="200" stroke="#6366f1" stroke-width="1"/>
+    <line x1="0" y1="300" x2="1200" y2="300" stroke="#6366f1" stroke-width="1"/>
+    <line x1="0" y1="400" x2="1200" y2="400" stroke="#6366f1" stroke-width="1"/>
+    <line x1="0" y1="500" x2="1200" y2="500" stroke="#6366f1" stroke-width="1"/>
+    <line x1="200" y1="0" x2="200" y2="630" stroke="#6366f1" stroke-width="1"/>
+    <line x1="400" y1="0" x2="400" y2="630" stroke="#6366f1" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="#6366f1" stroke-width="1"/>
+    <line x1="800" y1="0" x2="800" y2="630" stroke="#6366f1" stroke-width="1"/>
+    <line x1="1000" y1="0" x2="1000" y2="630" stroke="#6366f1" stroke-width="1"/>
+  </g>
+
+  <!-- Logo - Larger version -->
+  <g transform="translate(100, 180)">
+    <circle cx="75" cy="75" r="70" fill="none" stroke="url(#logoGradient)" stroke-width="6"/>
+    <path d="M40 50 Q75 35 110 50 Q75 65 40 50" fill="none" stroke="url(#logoGradient)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M40 75 Q75 60 110 75 Q75 90 40 75" fill="none" stroke="url(#logoGradient)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M40 100 Q75 85 110 100 Q75 115 40 100" fill="none" stroke="url(#logoGradient)" stroke-width="5" stroke-linecap="round"/>
+    <line x1="50" y1="40" x2="50" y2="110" stroke="url(#logoGradient)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+    <line x1="75" y1="30" x2="75" y2="120" stroke="url(#logoGradient)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+    <line x1="100" y1="40" x2="100" y2="110" stroke="url(#logoGradient)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Title -->
+  <text x="300" y="230" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="96" font-weight="800" fill="url(#textGradient)">Loom</text>
+
+  <!-- Tagline -->
+  <text x="300" y="300" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="36" fill="#e2e8f0">WASM-First API Gateway</text>
+
+  <!-- Feature badges -->
+  <g transform="translate(300, 350)">
+    <rect x="0" y="0" width="140" height="40" rx="20" fill="rgba(99, 102, 241, 0.3)" stroke="#6366f1" stroke-width="2"/>
+    <text x="70" y="27" font-family="system-ui, sans-serif" font-size="16" fill="#a5b4fc" text-anchor="middle">Proxy-Wasm</text>
+
+    <rect x="160" y="0" width="100" height="40" rx="20" fill="rgba(99, 102, 241, 0.3)" stroke="#6366f1" stroke-width="2"/>
+    <text x="210" y="27" font-family="system-ui, sans-serif" font-size="16" fill="#a5b4fc" text-anchor="middle">HTTP/3</text>
+
+    <rect x="280" y="0" width="130" height="40" rx="20" fill="rgba(99, 102, 241, 0.3)" stroke="#6366f1" stroke-width="2"/>
+    <text x="345" y="27" font-family="system-ui, sans-serif" font-size="16" fill="#a5b4fc" text-anchor="middle">AI Gateway</text>
+
+    <rect x="430" y="0" width="110" height="40" rx="20" fill="rgba(99, 102, 241, 0.3)" stroke="#6366f1" stroke-width="2"/>
+    <text x="485" y="27" font-family="system-ui, sans-serif" font-size="16" fill="#a5b4fc" text-anchor="middle">GraphQL</text>
+  </g>
+
+  <!-- Subtitle -->
+  <text x="300" y="460" font-family="system-ui, sans-serif" font-size="24" fill="#94a3b8">High-performance API routing with</text>
+  <text x="300" y="495" font-family="system-ui, sans-serif" font-size="24" fill="#94a3b8">native WebAssembly plugin support</text>
+
+  <!-- URL -->
+  <text x="300" y="560" font-family="system-ui, sans-serif" font-size="20" fill="#64748b">github.com/josedab/loom</text>
+
+  <!-- Decorative elements -->
+  <circle cx="1050" cy="150" r="80" fill="none" stroke="url(#logoGradient)" stroke-width="2" opacity="0.3"/>
+  <circle cx="1100" cy="450" r="120" fill="none" stroke="url(#logoGradient)" stroke-width="2" opacity="0.2"/>
+  <circle cx="950" cy="550" r="60" fill="none" stroke="url(#logoGradient)" stroke-width="2" opacity="0.2"/>
+</svg>
